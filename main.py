@@ -5,6 +5,7 @@ import scipy
 
 
 num = 30
+fps = 30
 path = 'Data/Video/2019_09_04_18_59_20_removed.mp4'
 #path = 'Data/Boat2.jpeg'
 cap = cv2.VideoCapture(path)
@@ -27,8 +28,9 @@ L =int(L/2)*2
 image = image[:,:L]
 mid = int(L/2)
 kernel_column = np.concatenate((np.linspace(0, -1, num = num), np.linspace(1,0,num = num)))
-
+S = np.shape(image)
 kernel = np.transpose(np.tile(kernel_column, (mid,1)))
+out = cv2.VideoWriter('outpy.avi',cv2.VideoWriter_fourcc(*"MJPG"), fps, (S[1],S[0]))
 
 # Read until video is completed
 while(cap.isOpened()):
@@ -62,10 +64,13 @@ while(cap.isOpened()):
 
 
         cv2.imshow('Result',image)
+
+        out.write(image)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     else:
         break
 
 cap.release()
+out.release()
 cv2.destroyAllWindows()
