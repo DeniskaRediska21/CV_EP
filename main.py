@@ -8,7 +8,7 @@ import os
 num = 30
 num2 = 5
 fps = 30
-Sobel_trashold = 50
+ED_trashold = 50
 verbose = True
 # path = 'Data/vecteezy_fishermen-going-to-the-sea-on-a-motor-boat_8051772.mov'
 path = 'Data/Video/1_2021_03_02_15_35_17_removed.mov'
@@ -101,7 +101,7 @@ while(cap.isOpened()):
         #points =  np.array([[l3, int(h3)],[0, H],[L_out, H], [l4, int(h4)]])
         #conv2 = cv2.Sobel(src=image[:int(np.min((h3,h4))),:], ddepth=cv2.CV_64F, dx=1, dy=0, ksize=1) # Sobel Edge Detection on the X axis
         conv2= np.abs(scipy.ndimage.convolve1d(image[:int(np.min((h3,h4))),:].astype(float), kernel2.astype(float), axis = 1))
-        conv2[conv2<Sobel_trashold] = 0
+        conv2[conv2<ED_trashold] = 0
     
 
         #image = cv2.fillPoly(image, pts=[points], color=0)
