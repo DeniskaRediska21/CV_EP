@@ -6,10 +6,12 @@ import scipy.signal
 import os
 
 num = 30
+num2 = 5
 fps = 30
+Sobel_trashold = 50
 verbose = True
 # path = 'Data/vecteezy_fishermen-going-to-the-sea-on-a-motor-boat_8051772.mov'
-path = 'Data/2021_03_02_06_16_46_removed.mov'
+path = 'Data/Video/1_2021_03_02_15_35_17_removed.mov'
 
 
 
@@ -38,11 +40,11 @@ if (cap.isOpened()== False):
  
 ret, image = cap.read()
 image = np.mean(image, axis = 2).astype('uint8')
-L,H = int(1280/320), int(720)
+L,H = int(2*1280/320), int(720)
 
 L_out = 1280
 
-show_r = False
+show_r = True
 
 image = cv2.resize(image,(L,H))
 
@@ -53,6 +55,10 @@ mid = int(L/2)
 kernel_column = np.concatenate((np.linspace(0, -1, num = num), np.linspace(1,0,num = num)))
 S = np.shape(image)
 kernel = np.transpose(np.tile(kernel_column, (mid,1)))
+
+
+kernel2 = np.concatenate((np.linspace(0, -1, num = num2), np.linspace(1,0,num = num2)))
+#kernel2 = np.array([1,-1])
 
 count = 0
 names = []
@@ -88,10 +94,19 @@ while(cap.isOpened()):
 
         h3 = k * l3 + b
         h4 = k * l4 + b
-        
+
+
      
-        image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
-        
+        #image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
+        #points =  np.array([[l3, int(h3)],[0, H],[L_out, H], [l4, int(h4)]])
+        #conv2 = cv2.Sobel(src=image[:int(np.min((h3,h4))),:], ddepth=cv2.CV_64F, dx=1, dy=0, ksize=1) # Sobel Edge Detection on the X axis
+        conv2= np.abs(scipy.ndimage.convolve1d(image[:int(np.min((h3,h4))),:].astype(float), kernel2.astype(float), axis = 1))
+        conv2[conv2<Sobel_trashold] = 0
+    
+
+        #image = cv2.fillPoly(image, pts=[points], color=0)
+        #image[int(np.max((h3,h4))):,:] = 0
+        #
         if show_r:
             l1_r = int(L/4)
             l2_r = 3*int(L/4)
@@ -116,7 +131,8 @@ while(cap.isOpened()):
         writer.append_data(image)
         if verbose:
             if show_r:
-                cv2.imshow('Result',image_r)
+                #cv2.imshow('Result',image_r)
+                cv2.imshow('Result',conv2)
             else:
                 cv2.imshow('Result',image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
