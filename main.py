@@ -6,7 +6,7 @@ import scipy.signal
 import os
 from sklearn.cluster import MeanShift, estimate_bandwidth
 
-
+cluster_treshold = 20
 num = 30
 num2 = 5
 fps = 30
@@ -76,6 +76,10 @@ if verbose:
 count = 0
 names = []
 conv2_prev = []
+
+cluster_centers = []
+cluster_centers_prev = []
+
 # Read until video is completed
 while(cap.isOpened()):
     ret, image = cap.read()
@@ -145,6 +149,12 @@ while(cap.isOpened()):
         ms.fit(points)
         labels = ms.labels_
         cluster_centers = ms.cluster_centers_
+        if np.size(cluster_centers_prev):
+            for i,cluster_center in enumerate(cluster_centers):
+                if np.min(np.abs(np.sum(cluster_center - cluster_centers_prev,axis = 1)))<cluster_treshold:
+                    np.delete(cluster_centers,i,0)
+                    
+        cluster_centers_prev = cluster_centers
 
         labels_unique = np.unique(labels)
         n_clusters_ = len(labels_unique)
