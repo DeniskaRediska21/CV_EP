@@ -78,21 +78,22 @@ names = []
 conv2_prev = []
 # Read until video is completed
 while(cap.isOpened()):
-    # Capture frame-by-frame
     ret, image = cap.read()
     if ret == True:
 
         image = np.mean(image, axis = 2).astype('uint8') # Making grayscale image from RGB
         # image = cv2.resize(image,(1280,720))
-        image = cv2.resize(image,(L_out,H))
-        image_r = cv2.resize(image,(L,H))
+        image = cv2.resize(image,(L_out,H)) # resize for horison detection
+        image_r = cv2.resize(image,(L,H)) # resize for other operations
 
+# Horison detection
         conv_L = scipy.signal.convolve(image_r[:,:mid], kernel, 'valid') # Convolution of left half with kernel
         conv_R = scipy.signal.convolve(image_r[:,mid:], kernel, 'valid') # Convolution of right half with kernel
         
         M_L = np.argmax(np.abs(conv_L)) # Index of max of conlolved image half 
         M_R = np.argmax(np.abs(conv_R)) # Index of max of conlolved image half
 
+# Horison line extrapolation
         # l1 = int(mid/2)
         # l2 = mid + int(mid/2)
         l1 = int(L_out/4)
@@ -109,10 +110,10 @@ while(cap.isOpened()):
         h3 = k * l3 + b
         h4 = k * l4 + b
 
-# BLUR
-        image = cv2.GaussianBlur(image, (3,3),0)     
+        image = cv2.GaussianBlur(image, (3,3),0) # Bluring 
         #image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
-        #points =  np.array([[l3, int(h3)],[0, H],[L_out, H], [l4, int(h4)]])
+
+# Edge detection
         #conv2 = cv2.Sobel(src=image[:int(np.min((h3,h4))),:], ddepth=cv2.CV_64F, dx=1, dy=0, ksize=1) # Sobel Edge Detection on the X axis
         conv2= np.abs(scipy.ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float), weights = kernel2.astype(float), axis = 1))
         if not np.shape(conv2_prev) == (0,):
@@ -131,8 +132,9 @@ while(cap.isOpened()):
         z_points = points[xp>0,:]
         conv2[z_points[:,0],z_points[:,1]] = 0
 
-        
-        conv2_prev = conv2
+
+
+        conv2_prev = conv2 # Saving to use in averaging
 
 
 # Clustering
@@ -149,9 +151,6 @@ while(cap.isOpened()):
 
         #print("number of estimated clusters : %d" % n_clusters_)
 
-        #image = cv2.fillPoly(image, pts=[points], color=0)
-        #image[int(np.max((h3,h4))):,:] = 0
-        #
         if show_r:
             l1_r = int(L/4)
             l2_r = 3*int(L/4)
@@ -175,15 +174,12 @@ while(cap.isOpened()):
 
         if verbose:
             if show_r:
-                #cv2.imshow('Result',image_r)
-                # SH = np.shape(np.hstack((image,)))
                 
                 conv2_disp = np.vstack(((255*conv2/np.max(conv2)).astype('uint8'),image[np.shape(conv2)[0]:,:]))
                 for center in cluster_centers:
                     conv2_disp = cv2.circle(conv2_disp, (int(center[1]),int(center[0])), radius=10, color=(255, 255, 255), thickness=10)
 
                 disp = np.hstack((image,conv2_disp))
-                # cv2.imshow()
                 cv2.imshow('Result', disp)
                 cv2.imwrite(names[-1], disp)
                 writer.append_data(disp)
