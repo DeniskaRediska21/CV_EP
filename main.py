@@ -7,18 +7,20 @@ import os
 from sklearn.cluster import MeanShift, estimate_bandwidth
 
 cluster_treshold = 20
-num = 30
+num = 60
 num2 = 5
 fps = 30
 ED_trashold = 50
 verbose = True
 # path = 'Data/vecteezy_fishermen-going-to-the-sea-on-a-motor-boat_8051772.mov'
 #path = 'Data/Video/1_2021_03_02_15_35_17_removed.mov'
-path = 'Data/Video/2_2019_09_04_18_59_20_removed.mp4'
+# path = 'Data/Video/2_2019_09_04_18_59_20_removed.mp4'
 #path = 'Data/Video/3_2021_03_02_06_16_46_removed.mov'
 #path = 'Data/Video/4_2021_03_02_07_10_50_removed.mp4'
 #path = 'Data/Video/5_2021_03_05_10_52_37_removed.mp4'
 #path = 'Data/2021_03_02_06_16_46_removed.mov'
+# path = 'Data/Digital Combat Simulator  Black Shark 2024.03.05 - 14.19.52.21.mp4'
+path = 'Data/Digital Combat Simulator  Black Shark 2024.03.05 - 14.19.52.21 - Trim.mp4'
 
 
 out_directory = path[:path.rfind('.')-1]
@@ -31,7 +33,7 @@ if not os.path.exists(out_directory):
 cap = cv2.VideoCapture(path)
 
 
-line_width = 1
+line_width = 2
 
 
 writer = imageio.get_writer(f'{out_directory}/video.avi', fps=fps)
@@ -43,7 +45,9 @@ if (cap.isOpened()== False):
  
 ret, image = cap.read()
 image = np.mean(image, axis = 2).astype('uint8')
-L,H = int(2*1280/320), int(720)
+
+slices = 8
+L,H = int(slices*1280/320), int(720)
 
 L_out = 1280
 
@@ -57,7 +61,9 @@ image = image[:,:L]
 mid = int(L/2)
 kernel_column = np.concatenate((np.linspace(0, -1, num = num), np.linspace(1,0,num = num)))
 S = np.shape(image)
-kernel = np.transpose(np.tile(kernel_column, (mid,1)))
+
+
+
 
 
 kernel2 = np.concatenate((np.linspace(0, -1, num = num2), np.linspace(1,0,num = num2)))
@@ -80,8 +86,13 @@ conv2_prev = []
 cluster_centers = []
 cluster_centers_prev = []
 
+convolve_list = list(range(0,L + int(L/slices),int(L/slices)))
+
+kernel = np.transpose(np.tile(kernel_column, (int(L/slices),1)))
+
 # Read until video is completed
 while(cap.isOpened()):
+    cluster_centers = []
     ret, image = cap.read()
     if ret == True:
 
@@ -91,28 +102,53 @@ while(cap.isOpened()):
         image_r = cv2.resize(image,(L,H)) # resize for other operations
 
 # Horison detection
-        conv_L = scipy.signal.convolve(image_r[:,:mid], kernel, 'valid') # Convolution of left half with kernel
-        conv_R = scipy.signal.convolve(image_r[:,mid:], kernel, 'valid') # Convolution of right half with kernel
+        M = []
+        for i in range(0,np.size(convolve_list)-1):
+            M.append(np.argmax(np.abs(scipy.signal.convolve(image_r[:,convolve_list[i]:convolve_list[i+1]],kernel,'valid'))))
+        l = np.linspace(0,1280,slices+3)[1:-1]
+        l = np.delete(l,int(np.size(l)/2))
         
-        M_L = np.argmax(np.abs(conv_L)) # Index of max of conlolved image half 
-        M_R = np.argmax(np.abs(conv_R)) # Index of max of conlolved image half
+        d = np.abs(M - np.median(M))
+        mdev = np.median(d)
+        s = d/mdev if mdev else np.zeros(len(d))
+        m = 2
+        
+        M = np.array(M)
+        M = M[s<m] + num
+        l = l[s<m]
+        
+        print(M)
+        
+        # l = [int(L_out/4),3*int(L_out/4)]
+        # M = [np.median(M[:int(np.size(M)/2)]), np.median(M[int(np.size(M)/2):])]
+        # M = median_filter(M,size = 3)
+        
+        
+        # conv_L = scipy.signal.convolve(image_r[:,:mid], kernel, 'valid') # Convolution of left half with kernel
+        # conv_R = scipy.signal.convolve(image_r[:,mid:], kernel, 'valid') # Convolution of right half with kernel
+        
+        # M_L = np.argmax(np.abs(conv_L)) # Index of max of conlolved image half 
+        # M_R = np.argmax(np.abs(conv_R)) # Index of max of conlolved image half
 
 # Horison line extrapolation
-        # l1 = int(mid/2)
-        # l2 = mid + int(mid/2)
-        l1 = int(L_out/4)
-        l2 = 3*int(L_out/4)
-        h1 = M_L + num
-        h2 = M_R + num
 
-        k = (h2 - h1)/(l2 - l1)
-        b = h1 - k*l1
+        # l1 = int(L_out/4)
+        # l2 = 3*int(L_out/4)
+        # h1 = M_L + num
+        # h2 = M_R + num
+
+        # k = (h2 - h1)/(l2 - l1)
+        # b = h1 - k*l1
 
         l3 = 0
         l4 = L_out
 
-        h3 = k * l3 + b
-        h4 = k * l4 + b
+        # h3 = k * l3 + b
+        # h4 = k * l4 + b
+        
+        h3,h4 = np.polyval(np.polyfit(l,M,1),[l3,l4])
+        # h3 = np.median(M)
+        # h4 = h3
 
         image = cv2.GaussianBlur(image, (3,3),0) # Bluring 
         #image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
@@ -144,38 +180,39 @@ while(cap.isOpened()):
 # Clustering
         # The following bandwidth can be automatically detected using
         # bandwidth = estimate_bandwidth(points, quantile=0.2, n_samples=500)
-        bandwidth = 50
-        ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-        ms.fit(points)
-        labels = ms.labels_
-        cluster_centers = ms.cluster_centers_
-        if np.size(cluster_centers_prev):
-            for i,cluster_center in enumerate(cluster_centers):
-                if np.min(np.abs(np.sum(cluster_center - cluster_centers_prev,axis = 1)))<cluster_treshold:
-                    np.delete(cluster_centers,i,0)
-                    
-        cluster_centers_prev = cluster_centers
+        if np.size(points) > 0:
+            bandwidth = 50
+            ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            ms.fit(points)
+            labels = ms.labels_
+            cluster_centers = ms.cluster_centers_
+            if np.size(cluster_centers_prev):
+                for i,cluster_center in enumerate(cluster_centers):
+                    if np.min(np.abs(np.sum(cluster_center - cluster_centers_prev,axis = 1)))<cluster_treshold:
+                        np.delete(cluster_centers,i,0)
+                        
+            cluster_centers_prev = cluster_centers
 
-        labels_unique = np.unique(labels)
-        n_clusters_ = len(labels_unique)
+            labels_unique = np.unique(labels)
+            n_clusters_ = len(labels_unique)
 
         #print("number of estimated clusters : %d" % n_clusters_)
 
-        if show_r:
-            l1_r = int(L/4)
-            l2_r = 3*int(L/4)
-            h1_r = M_L + num
-            h2_r = M_R + num
+        # if show_r:
+        #     l1_r = int(L/4)
+        #     l2_r = 3*int(L/4)
+        #     h1_r = M_L + num
+        #     h2_r = M_R + num
     
-            k_r = (h2_r - h1_r)/(l2_r - l1_r)
-            b_r = h1_r - k*l1_r
-            l3_r = 0
-            l4_r = L
+        #     k_r = (h2_r - h1_r)/(l2_r - l1_r)
+        #     b_r = h1_r - k*l1_r
+        #     l3_r = 0
+        #     l4_r = L
     
-            h3_r = k_r * l3_r + b_r
-            h4_r = k_r * l4_r + b_r
+        #     h3_r = k_r * l3_r + b_r
+        #     h4_r = k_r * l4_r + b_r
             
-            image_r = cv2.line(image_r, (l3_r, int(h3_r)), (l4_r, int(h4_r)), (0,0,255),line_width)
+        #     image_r = cv2.line(image_r, (l3_r, int(h3_r)), (l4_r, int(h4_r)), (0,0,255),line_width)
             
 
 
@@ -188,6 +225,8 @@ while(cap.isOpened()):
                 conv2_disp = np.vstack(((255*conv2/np.max(conv2)).astype('uint8'),image[np.shape(conv2)[0]:,:]))
                 for center in cluster_centers:
                     conv2_disp = cv2.circle(conv2_disp, (int(center[1]),int(center[0])), radius=10, color=(255, 255, 255), thickness=10)
+                
+                image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
 
                 disp = np.hstack((image,conv2_disp))
                 cv2.imshow('Result', disp)
