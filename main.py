@@ -10,8 +10,10 @@ cluster_treshold = 20
 num = 60
 num2 = 5
 fps = 30
-ED_trashold = 50
+ED_trashold = 30
 verbose = True
+
+rect_line_width = 2
 # path = 'Data/vecteezy_fishermen-going-to-the-sea-on-a-motor-boat_8051772.mov'
 #path = 'Data/Video/1_2021_03_02_15_35_17_removed.mov'
 # path = 'Data/Video/2_2019_09_04_18_59_20_removed.mp4'
@@ -20,8 +22,8 @@ verbose = True
 #path = 'Data/Video/5_2021_03_05_10_52_37_removed.mp4'
 #path = 'Data/2021_03_02_06_16_46_removed.mov'
 # path = 'Data/Digital Combat Simulator  Black Shark 2024.03.05 - 14.19.52.21.mp4'
-path = 'Data/Digital Combat Simulator  Black Shark 2024.03.05 - 14.19.52.21 - Trim.mp4'
-
+# path = 'Data/Digital Combat Simulator  Black Shark 2024.03.05 - 14.19.52.21 - Trim.mp4'
+path = 'Data/youtube2.mp4'
 
 out_directory = path[:path.rfind('.')-1]
 
@@ -48,7 +50,7 @@ image = np.mean(image, axis = 2).astype('uint8')
 
 slices = 8
 L,H = int(slices*1280/320), int(720)
-
+r_L,r_H = 86,86
 L_out = 1280
 
 show_r = True
@@ -117,44 +119,19 @@ while(cap.isOpened()):
         M = M[s<m] + num
         l = l[s<m]
         
-        print(M)
-        
-        # l = [int(L_out/4),3*int(L_out/4)]
-        # M = [np.median(M[:int(np.size(M)/2)]), np.median(M[int(np.size(M)/2):])]
-        # M = median_filter(M,size = 3)
-        
-        
-        # conv_L = scipy.signal.convolve(image_r[:,:mid], kernel, 'valid') # Convolution of left half with kernel
-        # conv_R = scipy.signal.convolve(image_r[:,mid:], kernel, 'valid') # Convolution of right half with kernel
-        
-        # M_L = np.argmax(np.abs(conv_L)) # Index of max of conlolved image half 
-        # M_R = np.argmax(np.abs(conv_R)) # Index of max of conlolved image half
 
 # Horison line extrapolation
 
-        # l1 = int(L_out/4)
-        # l2 = 3*int(L_out/4)
-        # h1 = M_L + num
-        # h2 = M_R + num
-
-        # k = (h2 - h1)/(l2 - l1)
-        # b = h1 - k*l1
 
         l3 = 0
         l4 = L_out
-
-        # h3 = k * l3 + b
-        # h4 = k * l4 + b
         
         h3,h4 = np.polyval(np.polyfit(l,M,1),[l3,l4])
-        # h3 = np.median(M)
-        # h4 = h3
+
 
         image = cv2.GaussianBlur(image, (3,3),0) # Bluring 
-        #image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
 
 # Edge detection
-        #conv2 = cv2.Sobel(src=image[:int(np.min((h3,h4))),:], ddepth=cv2.CV_64F, dx=1, dy=0, ksize=1) # Sobel Edge Detection on the X axis
         conv2= np.abs(scipy.ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float), weights = kernel2.astype(float), axis = 1))
         if not np.shape(conv2_prev) == (0,):
             I= np.min(np.vstack((np.shape(conv2),np.shape(conv2_prev))),axis = 0)
@@ -192,41 +169,59 @@ while(cap.isOpened()):
                         np.delete(cluster_centers,i,0)
                         
             cluster_centers_prev = cluster_centers
-
             labels_unique = np.unique(labels)
             n_clusters_ = len(labels_unique)
-
-        #print("number of estimated clusters : %d" % n_clusters_)
-
-        # if show_r:
-        #     l1_r = int(L/4)
-        #     l2_r = 3*int(L/4)
-        #     h1_r = M_L + num
-        #     h2_r = M_R + num
-    
-        #     k_r = (h2_r - h1_r)/(l2_r - l1_r)
-        #     b_r = h1_r - k*l1_r
-        #     l3_r = 0
-        #     l4_r = L
-    
-        #     h3_r = k_r * l3_r + b_r
-        #     h4_r = k_r * l4_r + b_r
             
-        #     image_r = cv2.line(image_r, (l3_r, int(h3_r)), (l4_r, int(h4_r)), (0,0,255),line_width)
+# Framing
+        center_points = cluster_centers
+        TRASH = np.full(np.shape(center_points)[0], True)
+        rects = []
+        for j,center_point in enumerate(center_points):
             
+            det = np.abs(center_points - center_point)
+            step = (det < [r_L,r_H]).all(axis = 1)
+            flag = True
+            for i,rect in enumerate(rects):
+                if (np.abs(rect - center_point) < [r_L,r_H]).all():
+                    rects[i] = np.vstack((np.squeeze(rects[i]),center_point[TRASH[j]]))
+                    TRASH[j] = False
+                    # step = np.delete(step,j)
+                    flag = False
+            if flag:
+                if np.size(rects)>0: 
+                    rects.append(center_points[np.all((step,TRASH),axis = 0)]) 
+                     
+                else:
+                    rects = list([center_points[step]])
+                
+                TRASH[step] = False
+        
+        mean = []
+        for i,rect in enumerate(rects):
+            mean.append(np.mean(rect,axis = 0))
+        mean = np.array(mean)
+        
+        if np.size(mean)>0:
+            rect_centers = np.flip(mean - [r_L/2,r_H/2],axis = 1)
+
+# Plotting and Saving
 
 
         names.append(f"{out_directory}/%d.jpg"%count)
         count+=1
 
         if verbose:
-            if show_r:
-                
+            if show_r:      
                 conv2_disp = np.vstack(((255*conv2/np.max(conv2)).astype('uint8'),image[np.shape(conv2)[0]:,:]))
                 for center in cluster_centers:
                     conv2_disp = cv2.circle(conv2_disp, (int(center[1]),int(center[0])), radius=10, color=(255, 255, 255), thickness=10)
-                
+
                 image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
+                if np.size(mean)>0:
+                    for rect_center in rect_centers:
+                        rect_center[rect_center<0] = 0
+                        image = cv2.rectangle(image, rect_center.astype(int), (rect_center + [r_L,r_H]).astype(int),255,rect_line_width)
+                
 
                 disp = np.hstack((image,conv2_disp))
                 cv2.imshow('Result', disp)
