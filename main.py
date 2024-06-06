@@ -3,30 +3,50 @@ import cv2
 import numpy as np
 import scipy
 import scipy.signal
+import scipy.ndimage as ndimage
 import os
 from sklearn.cluster import MeanShift, estimate_bandwidth
+import csv
+
+np.seterr(invalid='ignore')
 
 cluster_treshold = 20
 num = 60
 num2 = 5
 fps = 30
-ED_trashold = 30
+ED_trashold = 20
+bandwidth = 50
+
+test_accuracy = True
+
+path_ = os.path.join('Data','Разметка','Labeling_ships_clear')
+path_accuracy = os.path.join(path_,'labels')
+
+number_hit = []
+number = []
+
+write = False
 verbose = True
 
 rect_line_width = 2
-# path = 'Data/vecteezy_fishermen-going-to-the-sea-on-a-motor-boat_8051772.mov'
-#path = 'Data/Video/1_2021_03_02_15_35_17_removed.mov'
-# path = 'Data/Video/2_2019_09_04_18_59_20_removed.mp4'
-#path = 'Data/Video/3_2021_03_02_06_16_46_removed.mov'
-#path = 'Data/Video/4_2021_03_02_07_10_50_removed.mp4'
-#path = 'Data/Video/5_2021_03_05_10_52_37_removed.mp4'
-#path = 'Data/2021_03_02_06_16_46_removed.mov'
-# path = 'Data/Digital Combat Simulator  Black Shark 2024.03.05 - 14.19.52.21.mp4'
-# path = 'Data/Digital Combat Simulator  Black Shark 2024.03.05 - 14.19.52.21 - Trim.mp4'
-path = 'Data/youtube2.mp4'
 
-out_directory = path[:path.rfind('.')-1]
+path = os.path.join(path_,'video.avi')
 
+out_directory = path[:path.rfind('.')]
+
+labels_ = []
+if test_accuracy:
+    txt_files=[]
+    
+    for file in os.listdir(path_accuracy):
+        if file.endswith('.txt'):
+            txt_files.append(file)
+            with open(path_accuracy+'/'+file) as csvfile:
+                reader=csv.reader(csvfile, delimiter = ' ')
+                rows= []
+                for row in reader:
+                    rows.append([float(value) for value in row])
+                labels_.append(rows)
 
 
 if not os.path.exists(out_directory):
@@ -37,8 +57,8 @@ cap = cv2.VideoCapture(path)
 
 line_width = 2
 
-
-writer = imageio.get_writer(f'{out_directory}/video.avi', fps=fps)
+if write:
+    writer = imageio.get_writer(f'{out_directory}/video.avi', fps=fps)
 
 
 # Check if camera opened successfully
@@ -94,6 +114,8 @@ kernel = np.transpose(np.tile(kernel_column, (int(L/slices),1)))
 
 # Read until video is completed
 while(cap.isOpened()):
+    rect_centers = []
+    label = np.array(labels_[count])
     cluster_centers = []
     ret, image = cap.read()
     if ret == True:
@@ -132,7 +154,7 @@ while(cap.isOpened()):
         image = cv2.GaussianBlur(image, (3,3),0) # Bluring 
 
 # Edge detection
-        conv2= np.abs(scipy.ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float), weights = kernel2.astype(float), axis = 1))
+        conv2= np.abs(ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float), weights = kernel2.astype(float), axis = 1))
         if not np.shape(conv2_prev) == (0,):
             I= np.min(np.vstack((np.shape(conv2),np.shape(conv2_prev))),axis = 0)
             conv2_meaned = np.mean((conv2[:int(I[0]),:],conv2_prev[:int(I[0]),:]),axis = 0)
@@ -158,7 +180,6 @@ while(cap.isOpened()):
         # The following bandwidth can be automatically detected using
         # bandwidth = estimate_bandwidth(points, quantile=0.2, n_samples=500)
         if np.size(points) > 0:
-            bandwidth = 50
             ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
             ms.fit(points)
             labels = ms.labels_
@@ -188,7 +209,7 @@ while(cap.isOpened()):
                     # step = np.delete(step,j)
                     flag = False
             if flag:
-                if np.size(rects)>0: 
+                if len(rects)>0: 
                     rects.append(center_points[np.all((step,TRASH),axis = 0)]) 
                      
                 else:
@@ -208,15 +229,16 @@ while(cap.isOpened()):
 
 
         names.append(f"{out_directory}/%d.jpg"%count)
-        count+=1
+        
 
         if verbose:
             if show_r:      
                 conv2_disp = np.vstack(((255*conv2/np.max(conv2)).astype('uint8'),image[np.shape(conv2)[0]:,:]))
                 for center in cluster_centers:
                     conv2_disp = cv2.circle(conv2_disp, (int(center[1]),int(center[0])), radius=10, color=(255, 255, 255), thickness=10)
-
-                image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
+                    for row in label:
+                        conv2_disp = cv2.circle(conv2_disp, (int(row[1] * L_out),int(row[2] * H)), radius=5, color=(255, 0, 0), thickness=10)
+                # image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
                 if np.size(mean)>0:
                     for rect_center in rect_centers:
                         rect_center[rect_center<0] = 0
@@ -225,19 +247,53 @@ while(cap.isOpened()):
 
                 disp = np.hstack((image,conv2_disp))
                 cv2.imshow('Result', disp)
-                cv2.imwrite(names[-1], disp)
-                writer.append_data(disp)
+                
+                if write:
+                    cv2.imwrite(names[-1], disp)
+                    writer.append_data(disp)
             else:
                 cv2.imshow('Result',image)
-                cv2.imwrite(names[-1], image)
-                writer.append_data(image)
+                if write:
+                    cv2.imwrite(names[-1], image)
+                    writer.append_data(image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+
+
+        
+        acc = 0
+        
+        if len(rect_centers) > 0:
+            for row in label:
+                acc += any(np.abs(row[1] * L_out - rect_centers[:,0]) < r_L) and any(np.abs(row[2] * H - rect_centers[:,1]) < r_H)
             
-                
+        number_hit.append(acc)
+        number.append(label.shape[0])
+        
+        print(f'{number_hit[count]} / {label.shape[0]}')
+        
+        
+        
+        count+=1       
     else:
         break
 
-writer.close()
+if write:
+    writer.close()
+    
 cap.release()
 cv2.destroyAllWindows()
+
+# print(accuracy)
+
+
+import matplotlib.pyplot as plot
+accuracy = 100 * (np.array(number_hit)/np.array(number))
+plot.plot(accuracy)
+plot.plot(np.mean(accuracy) * np.ones(np.shape(accuracy)))
+plot.title('Точность решения задачи выделения зон интереса')
+plot.xlabel('Номер кадра')
+plot.ylabel('Точность, %')
+plot.legend(['Точность','Среднее значение'])
+plot.grid()
+plot.show()
