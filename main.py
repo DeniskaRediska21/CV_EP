@@ -7,7 +7,10 @@ import scipy.ndimage as ndimage
 import os
 from sklearn.cluster import MeanShift, estimate_bandwidth
 import csv
+import cupy
 
+# import cupyx.scipy.ndimage as ndimage
+# ndimage.convolve1d(input = cupy.array(image[...]), cupy.array(weights = kernel2.astype(float)), axis = 1)
 np.seterr(invalid='ignore')
 
 cluster_treshold = 20
@@ -27,6 +30,7 @@ number = []
 
 write = False
 verbose = True
+
 
 rect_line_width = 2
 
@@ -154,7 +158,8 @@ while(cap.isOpened()):
         image = cv2.GaussianBlur(image, (3,3),0) # Bluring 
 
 # Edge detection
-        conv2= np.abs(ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float), weights = kernel2.astype(float), axis = 1))
+#        print(image[:int(np.max((h3,h4))),:].astype(float).shape)
+        conv2= np.abs(ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float),weights = kernel2.astype(float), axis = 1))
         if not np.shape(conv2_prev) == (0,):
             I= np.min(np.vstack((np.shape(conv2),np.shape(conv2_prev))),axis = 0)
             conv2_meaned = np.mean((conv2[:int(I[0]),:],conv2_prev[:int(I[0]),:]),axis = 0)
