@@ -1,3 +1,6 @@
+# To profile use:
+# python -m cProfile -s time -o p.dat -m main_gpu
+# snakeviz p.dat
 import imageio
 import cv2
 import numpy as np
@@ -31,7 +34,7 @@ fps = 30
 ED_trashold = 20
 bandwidth = 10
 
-test_accuracy = True
+test_accuracy = False
 
 path_ = os.path.join('Data','Разметка','Labeling_ships_clear')
 path_accuracy = os.path.join(path_,'labels')
@@ -132,7 +135,8 @@ kernel = cp.array(kernel_column)
 
 while(cap.isOpened()):
     rect_centers = []
-    label = np.array(labels_[count])
+    if test_accuracy:
+        label = np.array(labels_[count])
     cluster_centers = []
     ret, image = cap.read()
     if ret == True:
@@ -262,8 +266,9 @@ while(cap.isOpened()):
                 conv2_disp = np.vstack(((255*conv2/np.max(conv2)).astype('uint8'),image[np.shape(conv2)[0]:,:]))
                 for center in cluster_centers:
                     conv2_disp = cv2.circle(conv2_disp, (int(center[1]),int(center[0])), radius=10, color=(255, 255, 255), thickness=10)
-                    for row in label:
-                        conv2_disp = cv2.circle(conv2_disp, (int(row[1] * L_out),int(row[2] * H)), radius=5, color=(255, 0, 0), thickness=10)
+                    if test_accuracy:
+                        for row in label:
+                            conv2_disp = cv2.circle(conv2_disp, (int(row[1] * L_out),int(row[2] * H)), radius=5, color=(255, 0, 0), thickness=10)
                 # image = cv2.line(image, (l3, int(h3)), (l4, int(h4)), (0,0,255),line_width)
                 if np.size(mean)>0:
                     for rect_center in rect_centers:
@@ -288,15 +293,17 @@ while(cap.isOpened()):
 
         
         acc = 0
-        
-        if len(rect_centers) > 0:
-            for row in label:
-                acc += any(np.abs(row[1] * L_out - rect_centers[:,0]) < r_L) and any(np.abs(row[2] * H - rect_centers[:,1]) < r_H)
+        if test_accuracy:
+            if len(rect_centers) > 0:
+                for row in label:
+                    acc += any(np.abs(row[1] * L_out - rect_centers[:,0]) < r_L) and any(np.abs(row[2] * H - rect_centers[:,1]) < r_H)
             
-        number_hit.append(acc)
-        number.append(label.shape[0])
+            number_hit.append(acc)
+            number.append(label.shape[0])
         
-        print(f'{number_hit[count]} / {label.shape[0]}      {total} s')
+            print(f'{number_hit[count]} / {label.shape[0]}      {1/total} fps')
+        else:
+            print(f'{1/total} fps')
         
         
         
