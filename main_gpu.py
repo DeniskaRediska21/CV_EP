@@ -4,13 +4,23 @@ import numpy as np
 import scipy
 import scipy.signal
 
+import time
 import os
-from sklearn.cluster import MeanShift, estimate_bandwidth
+
+import six
+import sys
+sys.modules['sklearn.externals.six'] = six
+#from utils.mean_shift_cosine_gpu import MeanShiftCosine as MeanShift
+
+#from  meanshift.mean_shift_gpu  import  MeanShiftEuc as MeanShift
+from sklearn.cluster import DBSCAN
+#from sklearn.cluster import MeanShift
 import csv
-import cupy
+import cupy as cp
+import cupyx
 
 import cupyx.scipy.ndimage as ndimage
-
+from cupyx.scipy.signal import convolve
 
 np.seterr(invalid='ignore')
 
@@ -19,7 +29,7 @@ num = 60
 num2 = 5
 fps = 30
 ED_trashold = 20
-bandwidth = 50
+bandwidth = 10
 
 test_accuracy = True
 
@@ -94,7 +104,8 @@ S = np.shape(image)
 
 
 kernel2 = np.concatenate((np.linspace(0, -1, num = num2), np.linspace(1,0,num = num2)))
-#kernel2 = np.array([1,-1])
+kernel2 = cp.array(kernel2)
+
 
 
 
@@ -114,8 +125,8 @@ cluster_centers = []
 cluster_centers_prev = []
 
 convolve_list = list(range(0,L + int(L/slices),int(L/slices)))
-
-kernel = np.transpose(np.tile(kernel_column, (int(L/slices),1)))
+kernel = cp.array(kernel_column)
+#kernel = np.transpose(np.tile(kernel_column, (int(L/slices),1)))
 
 # Read until video is completed
 while(cap.isOpened()):
@@ -130,13 +141,15 @@ while(cap.isOpened()):
         image = cv2.resize(image,(L_out,H)) # resize for horison detection
         image_r = cv2.resize(image,(L,H)) # resize for other operations
 
+        t0= time.time()
 # Horison detection
         M = []
         for i in range(0,np.size(convolve_list)-1):
-            M.append(np.argmax(np.abs(scipy.signal.convolve(image_r[:,convolve_list[i]:convolve_list[i+1]],kernel,'valid'))))
+            image_r = cp.array(image_r) 
+            M.append(np.argmax(np.abs(convolve(cp.mean(image_r[:,convolve_list[i]:convolve_list[i+1]],axis = 1),kernel,'valid'))).get())
         l = np.linspace(0,1280,slices+3)[1:-1]
         l = np.delete(l,int(np.size(l)/2))
-        
+        M = np.array(M) 
         d = np.abs(M - np.median(M))
         mdev = np.median(d)
         s = d/mdev if mdev else np.zeros(len(d))
@@ -155,12 +168,13 @@ while(cap.isOpened()):
         
         h3,h4 = np.polyval(np.polyfit(l,M,1),[l3,l4])
 
-
-        image = cv2.GaussianBlur(image, (3,3),0) # Bluring 
+        image = cp.array(image)
+        image = cupyx.scipy.ndimage.gaussian_filter(image, sigma = 0.3)
+        #image = cv2.GaussianBlur(image, (3,3),0) # Bluring 
 
 # Edge detection
-        conv2 = np.abs(ndimage.convolve1d(input = cupy.array(image[:int(np.max((h3,h4))),:].astype(float)), weights =cupy.array(kernel2.astype(float)), axis = 1)).get()
-
+        conv2 = np.abs(ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float), weights =kernel2.astype(float), axis = 1)).get()
+        #image = image.get()
         #conv2= np.abs(ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float),weights = kernel2.astype(float), axis = 1))
         if not np.shape(conv2_prev) == (0,):
             I= np.min(np.vstack((np.shape(conv2),np.shape(conv2_prev))),axis = 0)
@@ -187,10 +201,14 @@ while(cap.isOpened()):
         # The following bandwidth can be automatically detected using
         # bandwidth = estimate_bandwidth(points, quantile=0.2, n_samples=500)
         if np.size(points) > 0:
-            ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            #ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            #ms = MeanShift(bandwidth=bandwidth,  GPU = True)
+            ms = DBSCAN(eps =50, min_samples = 1)
             ms.fit(points)
             labels = ms.labels_
-            cluster_centers = ms.cluster_centers_
+            
+            #cluster_centers = ms.cluster_centers_
+            cluster_centers = np.array([np.mean(points[ms.labels_ == v],axis = 0) for v in np.unique(ms.labels_)])
             if np.size(cluster_centers_prev):
                 for i,cluster_center in enumerate(cluster_centers):
                     if np.min(np.abs(np.sum(cluster_center - cluster_centers_prev,axis = 1)))<cluster_treshold:
@@ -232,12 +250,13 @@ while(cap.isOpened()):
         if np.size(mean)>0:
             rect_centers = np.flip(mean - [r_L/2,r_H/2],axis = 1)
 
+        total = time.time() - t0
 # Plotting and Saving
 
 
         names.append(f"{out_directory}/%d.jpg"%count)
         
-
+        image = image.get()
         if verbose:
             if show_r:      
                 conv2_disp = np.vstack(((255*conv2/np.max(conv2)).astype('uint8'),image[np.shape(conv2)[0]:,:]))
@@ -277,7 +296,7 @@ while(cap.isOpened()):
         number_hit.append(acc)
         number.append(label.shape[0])
         
-        print(f'{number_hit[count]} / {label.shape[0]}')
+        print(f'{number_hit[count]} / {label.shape[0]}      {total} s')
         
         
         
@@ -293,14 +312,14 @@ cv2.destroyAllWindows()
 
 # print(accuracy)
 
-
-import matplotlib.pyplot as plot
-accuracy = 100 * (np.array(number_hit)/np.array(number))
-plot.plot(accuracy)
-plot.plot(np.mean(accuracy) * np.ones(np.shape(accuracy)))
-plot.title('Точность решения задачи выделения зон интереса')
-plot.xlabel('Номер кадра')
-plot.ylabel('Точность, %')
-plot.legend(['Точность','Среднее значение'])
-plot.grid()
-plot.show()
+if False:
+    import matplotlib.pyplot as plot
+    accuracy = 100 * (np.array(number_hit)/np.array(number))
+    plot.plot(accuracy)
+    plot.plot(np.mean(accuracy) * np.ones(np.shape(accuracy)))
+    plot.title('Точность решения задачи выделения зон интереса')
+    plot.xlabel('Номер кадра')
+    plot.ylabel('Точность, %')
+    plot.legend(['Точность','Среднее значение'])
+    plot.grid()
+    plot.show()
