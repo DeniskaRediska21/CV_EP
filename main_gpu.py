@@ -128,7 +128,8 @@ convolve_list = list(range(0,L + int(L/slices),int(L/slices)))
 kernel = cp.array(kernel_column)
 #kernel = np.transpose(np.tile(kernel_column, (int(L/slices),1)))
 
-# Read until video is completed
+# MAIN CYCLE
+
 while(cap.isOpened()):
     rect_centers = []
     label = np.array(labels_[count])
@@ -198,8 +199,6 @@ while(cap.isOpened()):
 
 
 # Clustering
-        # The following bandwidth can be automatically detected using
-        # bandwidth = estimate_bandwidth(points, quantile=0.2, n_samples=500)
         if np.size(points) > 0:
             #ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
             #ms = MeanShift(bandwidth=bandwidth,  GPU = True)
@@ -209,6 +208,7 @@ while(cap.isOpened()):
             
             #cluster_centers = ms.cluster_centers_
             cluster_centers = np.array([np.mean(points[ms.labels_ == v],axis = 0) for v in np.unique(ms.labels_)])
+
             if np.size(cluster_centers_prev):
                 for i,cluster_center in enumerate(cluster_centers):
                     if np.min(np.abs(np.sum(cluster_center - cluster_centers_prev,axis = 1)))<cluster_treshold:
@@ -217,8 +217,8 @@ while(cap.isOpened()):
             cluster_centers_prev = cluster_centers
             labels_unique = np.unique(labels)
             n_clusters_ = len(labels_unique)
-            
 # Framing
+ 
         center_points = cluster_centers
         TRASH = np.full(np.shape(center_points)[0], True)
         rects = []
