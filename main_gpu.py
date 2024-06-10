@@ -149,8 +149,8 @@ while(cap.isOpened()):
         t0= time.time()
 # Horison detection
         M = []
+        image_r = cp.array(image_r) 
         for i in range(0,np.size(convolve_list)-1):
-            image_r = cp.array(image_r) 
             M.append(np.argmax(np.abs(convolve(cp.mean(image_r[:,convolve_list[i]:convolve_list[i+1]],axis = 1),kernel,'valid'))).get())
         l = np.linspace(0,1280,slices+3)[1:-1]
         l = np.delete(l,int(np.size(l)/2))
