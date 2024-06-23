@@ -36,6 +36,20 @@ bandwidth = 10
 
 test_accuracy = False
 
+
+
+horison_angle_trashold = 30
+horison_height_trashold = 400
+horison_angle_delta_trashold = 10
+horison_height_delta_trashold = 100
+
+horison_angle = 0
+horison_height = 0
+
+edge_detection_edge_number_trashold = 1000
+
+clustering_cluster_number_trashold = 30
+
 path_ = os.path.join('Data','Разметка','Labeling_ships_clear')
 path_accuracy = os.path.join(path_,'labels')
 
@@ -134,6 +148,9 @@ kernel = cp.array(kernel_column)
 # MAIN CYCLE
 
 while(cap.isOpened()):
+    flag_horison_angle = False
+    
+
     rect_centers = []
     if test_accuracy:
         label = np.array(labels_[count])
@@ -172,6 +189,15 @@ while(cap.isOpened()):
         l4 = L_out
         
         h3,h4 = np.polyval(np.polyfit(l,M,1),[l3,l4])
+        
+        horison_angle_new = np.arctan((h4-h3)/(l4-l3))*180/np.pi
+        flag_horison_angle_delta = np.abs(horison_angle - horison_angle_new)>horison_angle_delta_trashold
+        horison_angle = horison_angle_new
+        flag_horison_angle = horison_angle > horison_angle_trashold
+
+        horison_height_new = H/2 - np.mean((h3,h4))
+        flag_horison_height_delta = np.abs(horison_height - horison_height_new)>horison_height_delta_trashold
+        flag_horison_height = horison_height > horison_height_trashold
 
         image = cp.array(image)
         image = cupyx.scipy.ndimage.gaussian_filter(image, sigma = 0.3)
@@ -201,6 +227,8 @@ while(cap.isOpened()):
 
         conv2_prev = conv2 # Saving to use in averaging
 
+        flag_edge_detection = len(points) > edge_detection_edge_number_trashold
+
 
 # Clustering
         if np.size(points) > 0:
@@ -221,6 +249,7 @@ while(cap.isOpened()):
             cluster_centers_prev = cluster_centers
             labels_unique = np.unique(labels)
             n_clusters_ = len(labels_unique)
+            flag_clustering = n_clusters_ > clustering_cluster_number_trashold 
 # Framing
  
         center_points = cluster_centers
