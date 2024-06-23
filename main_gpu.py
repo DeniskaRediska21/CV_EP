@@ -25,6 +25,10 @@ import cupyx
 import cupyx.scipy.ndimage as ndimage
 from cupyx.scipy.signal import convolve
 
+from Supports.horison_detection import detect_horison
+from Supports.edge_detection import detect_edges
+
+
 np.seterr(invalid='ignore')
 
 cluster_treshold = 20
@@ -148,7 +152,6 @@ kernel = cp.array(kernel_column)
 # MAIN CYCLE
 
 while(cap.isOpened()):
-    flag_horison_angle = False
     
 
     rect_centers = []
@@ -164,70 +167,27 @@ while(cap.isOpened()):
         image_r = cv2.resize(image,(L,H)) # resize for other operations
 
         t0= time.time()
+
 # Horison detection
-        M = []
-        image_r = cp.array(image_r) 
-        for i in range(0,np.size(convolve_list)-1):
-            M.append(np.argmax(np.abs(convolve(cp.mean(image_r[:,convolve_list[i]:convolve_list[i+1]],axis = 1),kernel,'valid'))).get())
-        l = np.linspace(0,1280,slices+3)[1:-1]
-        l = np.delete(l,int(np.size(l)/2))
-        M = np.array(M) 
-        d = np.abs(M - np.median(M))
-        mdev = np.median(d)
-        s = d/mdev if mdev else np.zeros(len(d))
-        m = 2
-        
-        M = np.array(M)
-        M = M[s<m] + num
-        l = l[s<m]
-        
-
-# Horison line extrapolation
+        [l3, l4, h3, h4, horison_angle, horison_height, flag_horison_angle, flag_horison_angle_delta,flag_horison_height,flag_horison_height_delta] = detect_horison(
+    image,
+    L,L_out,H,
+    kernel,convolve_list,
+    slices,num,
+    horison_angle, horison_height,
+    horison_angle_trashold, horison_angle_delta_trashold,
+    horison_height_trashold, horison_height_delta_trashold,
+    )
 
 
-        l3 = 0
-        l4 = L_out
-        
-        h3,h4 = np.polyval(np.polyfit(l,M,1),[l3,l4])
-        
-        horison_angle_new = np.arctan((h4-h3)/(l4-l3))*180/np.pi
-        flag_horison_angle_delta = np.abs(horison_angle - horison_angle_new)>horison_angle_delta_trashold
-        horison_angle = horison_angle_new
-        flag_horison_angle = horison_angle > horison_angle_trashold
-
-        horison_height_new = H/2 - np.mean((h3,h4))
-        flag_horison_height_delta = np.abs(horison_height - horison_height_new)>horison_height_delta_trashold
-        flag_horison_height = horison_height > horison_height_trashold
-
-        image = cp.array(image)
-        image = cupyx.scipy.ndimage.gaussian_filter(image, sigma = 0.3)
-        #image = cv2.GaussianBlur(image, (3,3),0) # Bluring 
-
-# Edge detection
-        conv2 = np.abs(ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float), weights =kernel2.astype(float), axis = 1)).get()
-        #image = image.get()
-        #conv2= np.abs(ndimage.convolve1d(input = image[:int(np.max((h3,h4))),:].astype(float),weights = kernel2.astype(float), axis = 1))
-        if not np.shape(conv2_prev) == (0,):
-            I= np.min(np.vstack((np.shape(conv2),np.shape(conv2_prev))),axis = 0)
-            conv2_meaned = np.mean((conv2[:int(I[0]),:],conv2_prev[:int(I[0]),:]),axis = 0)
-            conv2 = np.vstack((conv2_meaned,conv2[I[0]:,:]))
-            
-        conv2[conv2<ED_trashold] = 0
-        points = np.argwhere(conv2 > 0)
-
-
-# Zeroing points bellow the horison line through cross product
-        v1 = (l4 - l3, h4 - h3)
-        V2 = np.transpose(np.vstack((l4 - points[:,0], h4 - points[:,1])))
-        xp = np.multiply(v1[0],V2[:,1]) - np.multiply(v1[1], V2[:,0])
-        z_points = points[xp>0,:]
-        conv2[z_points[:,0],z_points[:,1]] = 0
-
-
-
-        conv2_prev = conv2 # Saving to use in averaging
-
-        flag_edge_detection = len(points) > edge_detection_edge_number_trashold
+# Edge detection                                                                                                                                                      
+        [image, conv2_prev, flag_edge_detection, conv2, points] = detect_edges(
+    image,
+    l3, l4, h3, h4,
+    kernel2,
+    conv2_prev,
+    ED_trashold, edge_detection_edge_number_trashold
+    )
 
 
 # Clustering
