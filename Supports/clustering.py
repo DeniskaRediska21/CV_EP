@@ -23,3 +23,16 @@ def cluster(points,cluster_treshold,clustering_cluster_number_trashold,cluster_c
         flag_clustering = n_clusters_ > clustering_cluster_number_trashold
         return cluster_centers, cluster_centers_prev, n_clusters_, flag_clustering
 
+
+
+def cluster_naive(points,cluster_treshold,clustering_cluster_number_trashold,cluster_centers_prev):
+    distance_trashold = 70
+    point_number = 0
+    points = np.array(points)
+    while point_number < len(points):
+        tmp_point = points[point_number,:]
+        points = points[(np.abs(points - points[point_number,:])>=distance_trashold).all(axis = 1)]
+        points = np.r_[[tmp_point],points]
+        point_number += 1
+    return points, points, len(points), False
+        

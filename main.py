@@ -1,4 +1,5 @@
 import imageio
+import time
 import cv2
 import numpy as np
 import scipy
@@ -7,18 +8,17 @@ import scipy.ndimage as ndimage
 import os
 from sklearn.cluster import MeanShift, estimate_bandwidth
 import csv
-import cupy
 
-# import cupyx.scipy.ndimage as ndimage
-# ndimage.convolve1d(input = cupy.array(image[...]), cupy.array(weights = kernel2.astype(float)), axis = 1)
 np.seterr(invalid='ignore')
 
-cluster_treshold = 20
+scaler = 1
+
+cluster_treshold = 20* scaler
 num = 60
 num2 = 5
 fps = 30
 ED_trashold = 20
-bandwidth = 50
+bandwidth = 50 * scaler
 
 test_accuracy = True
 
@@ -32,7 +32,7 @@ write = False
 verbose = True
 
 
-rect_line_width = 2
+rect_line_width = 2* scaler
 
 path = os.path.join(path_,'video.avi')
 
@@ -74,12 +74,12 @@ image = np.mean(image, axis = 2).astype('uint8')
 
 slices = 8
 L,H = int(slices*1280/320), int(720)
-r_L,r_H = 86,86
-L_out = 1280
+r_L,r_H = 86* scaler,86* scaler
+L_out = 1280* scaler
 
 show_r = True
 
-image = cv2.resize(image,(L,H))
+image = cv2.resize(image,(L* scaler,H* scaler))
 
 H,L = np.shape(image)
 L =int(L/2)*2
@@ -124,10 +124,12 @@ while(cap.isOpened()):
     ret, image = cap.read()
     if ret == True:
 
+
         image = np.mean(image, axis = 2).astype('uint8') # Making grayscale image from RGB
         # image = cv2.resize(image,(1280,720))
         image = cv2.resize(image,(L_out,H)) # resize for horison detection
         image_r = cv2.resize(image,(L,H)) # resize for other operations
+        t0= time.time()
 
 # Horison detection
         M = []
@@ -230,6 +232,10 @@ while(cap.isOpened()):
         if np.size(mean)>0:
             rect_centers = np.flip(mean - [r_L/2,r_H/2],axis = 1)
 
+        time.sleep(0.1)
+
+        total = time.time() - t0
+
 # Plotting and Saving
 
 
@@ -247,8 +253,10 @@ while(cap.isOpened()):
                 if np.size(mean)>0:
                     for rect_center in rect_centers:
                         rect_center[rect_center<0] = 0
-                        image = cv2.rectangle(image, rect_center.astype(int), (rect_center + [r_L,r_H]).astype(int),255,rect_line_width)
-                
+                        try:
+                            image = cv2.rectangle(image, rect_center.astype(int), (rect_center + [r_L,r_H]).astype(int),255,rect_line_width)
+                        except:
+                            pass
 
                 disp = np.hstack((image,conv2_disp))
                 cv2.imshow('Result', disp)
@@ -274,8 +282,8 @@ while(cap.isOpened()):
             
         number_hit.append(acc)
         number.append(label.shape[0])
-        
-        print(f'{number_hit[count]} / {label.shape[0]}')
+        # {number_hit[count]} / {label.shape[0]}  
+        print(f'{1/total} fps')
         
         
         

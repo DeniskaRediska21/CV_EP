@@ -28,16 +28,19 @@ from cupyx.scipy.signal import convolve
 from Supports.horison_detection import detect_horison
 from Supports.edge_detection import detect_edges
 from Supports.clustering import cluster
+from Supports.clustering import cluster_naive
 from Supports.framing import frame
 
 np.seterr(invalid='ignore')
 
-cluster_treshold = 20
+
+scaler = 1
+cluster_treshold = 20*scaler
 num = 60
 num2 = 5
 fps = 30
 ED_trashold = 20
-bandwidth = 10
+bandwidth = 10* scaler
 
 test_accuracy = False
 
@@ -65,7 +68,7 @@ write = False
 verbose = True
 
 
-rect_line_width = 2
+rect_line_width = 2*scaler
 
 path = os.path.join(path_,'video.avi')
 
@@ -107,12 +110,12 @@ image = np.mean(image, axis = 2).astype('uint8')
 
 slices = 8
 L,H = int(slices*1280/320), int(720)
-r_L,r_H = 86,86
-L_out = 1280
+r_L,r_H = 86*scaler,86*scaler
+L_out = 1280*scaler
 
 show_r = True
 
-image = cv2.resize(image,(L,H))
+image = cv2.resize(image,(L*scaler,H*scaler))
 
 H,L = np.shape(image)
 L =int(L/2)*2
@@ -192,11 +195,17 @@ while(cap.isOpened()):
 
 
 # Clustering
-        [cluster_centers, cluster_centers_prev, n_clusters_, flag_clustering] = cluster(
+        [cluster_centers, cluster_centers_prev, n_clusters_, flag_clustering] = cluster_naive(
     points,
     cluster_treshold,clustering_cluster_number_trashold,
     cluster_centers_prev,
     )
+
+#        [cluster_centers, cluster_centers_prev, n_clusters_, flag_clustering] = cluster(
+#    points,
+#    cluster_treshold,clustering_cluster_number_trashold,
+#    cluster_centers_prev,
+#    )
 
 # Framing
         [rect_centers,mean] = frame(cluster_centers,r_H,r_L)
