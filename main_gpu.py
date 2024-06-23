@@ -27,7 +27,8 @@ from cupyx.scipy.signal import convolve
 
 from Supports.horison_detection import detect_horison
 from Supports.edge_detection import detect_edges
-
+from Supports.clustering import cluster
+from Supports.framing import frame
 
 np.seterr(invalid='ignore')
 
@@ -191,57 +192,17 @@ while(cap.isOpened()):
 
 
 # Clustering
-        if np.size(points) > 0:
-            #ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-            #ms = MeanShift(bandwidth=bandwidth,  GPU = True)
-            ms = DBSCAN(eps =50, min_samples = 1)
-            ms.fit(points)
-            labels = ms.labels_
-            
-            #cluster_centers = ms.cluster_centers_
-            cluster_centers = np.array([np.mean(points[ms.labels_ == v],axis = 0) for v in np.unique(ms.labels_)])
+        [cluster_centers, cluster_centers_prev, n_clusters_, flag_clustering] = cluster(
+    points,
+    cluster_treshold,clustering_cluster_number_trashold,
+    cluster_centers_prev,
+    )
 
-            if np.size(cluster_centers_prev):
-                for i,cluster_center in enumerate(cluster_centers):
-                    if np.min(np.abs(np.sum(cluster_center - cluster_centers_prev,axis = 1)))<cluster_treshold:
-                        np.delete(cluster_centers,i,0)
-                        
-            cluster_centers_prev = cluster_centers
-            labels_unique = np.unique(labels)
-            n_clusters_ = len(labels_unique)
-            flag_clustering = n_clusters_ > clustering_cluster_number_trashold 
 # Framing
- 
-        center_points = cluster_centers
-        TRASH = np.full(np.shape(center_points)[0], True)
-        rects = []
-        for j,center_point in enumerate(center_points):
-            
-            det = np.abs(center_points - center_point)
-            step = (det < [r_L,r_H]).all(axis = 1)
-            flag = True
-            for i,rect in enumerate(rects):
-                if (np.abs(rect - center_point) < [r_L,r_H]).all():
-                    rects[i] = np.vstack((np.squeeze(rects[i]),center_point[TRASH[j]]))
-                    TRASH[j] = False
-                    # step = np.delete(step,j)
-                    flag = False
-            if flag:
-                if len(rects)>0: 
-                    rects.append(center_points[np.all((step,TRASH),axis = 0)]) 
-                     
-                else:
-                    rects = list([center_points[step]])
-                
-                TRASH[step] = False
-        
-        mean = []
-        for i,rect in enumerate(rects):
-            mean.append(np.mean(rect,axis = 0))
-        mean = np.array(mean)
-        
-        if np.size(mean)>0:
-            rect_centers = np.flip(mean - [r_L/2,r_H/2],axis = 1)
+        [rect_centers,mean] = frame(cluster_centers,r_H,r_L)
+
+
+
 
         total = time.time() - t0
 # Plotting and Saving
