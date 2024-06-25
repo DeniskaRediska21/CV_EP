@@ -47,7 +47,6 @@ def detect_horison_pyramid(image,L,L_out,H,kernel,convolve_list,slices,num,horis
     image_r_2 = cv2.resize(image,(L,H))
     image_r = cv2.resize(image_r_2,(L,int(H/scaler))) # resize for other operations
     
-    print(np.shape(image_r))
     M = []
     image_r = cp.array(image_r)
     for i in range(0,np.size(convolve_list)-1):
