@@ -25,7 +25,7 @@ import cupyx
 import cupyx.scipy.ndimage as ndimage
 from cupyx.scipy.signal import convolve
 
-from Supports.horison_detection import detect_horison
+from Supports.horison_detection import detect_horison, detect_horison_pyramid
 from Supports.edge_detection import detect_edges
 from Supports.clustering import cluster
 from Supports.clustering import cluster_naive
@@ -36,7 +36,7 @@ np.seterr(invalid='ignore')
 
 scaler = 1
 cluster_treshold = 20*scaler
-num = 60
+num = 4
 num2 = 5
 fps = 30
 ED_trashold = 20
@@ -173,7 +173,7 @@ while(cap.isOpened()):
         t0= time.time()
 
 # Horison detection
-        [l3, l4, h3, h4, horison_angle, horison_height, flag_horison_angle, flag_horison_angle_delta,flag_horison_height,flag_horison_height_delta] = detect_horison(
+        [l3, l4, h3, h4, horison_angle, horison_height, flag_horison_angle, flag_horison_angle_delta,flag_horison_height,flag_horison_height_delta] = detect_horison_pyramid(
     image,
     L,L_out,H,
     kernel,convolve_list,

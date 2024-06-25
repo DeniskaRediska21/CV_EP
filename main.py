@@ -232,7 +232,6 @@ while(cap.isOpened()):
         if np.size(mean)>0:
             rect_centers = np.flip(mean - [r_L/2,r_H/2],axis = 1)
 
-        time.sleep(0.1)
 
         total = time.time() - t0
 
