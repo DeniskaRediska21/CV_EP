@@ -8,37 +8,32 @@ import scipy
 
 verbose = True
 
-#path = os.path.join('Data','oleg_5120x2600_h256_24fps.mov')
-path = os.path.join('Data','out.mp4')
-cap = cv2.VideoCapture(path)
-if (cap.isOpened()== False): 
-  raise Exception("Error opening video stream or file")
-ret, image = cap.read()
+path = os.path.join('Data','test_images_bad_horizont')
+images = []
+for filename in os.listdir(path):
+    img = cv2.imread(os.path.join(path,filename))
+    if img is not None:
+        images.append(img)
 
-resolution_scale = 1
-
-H,L,D = np.shape(image)
-H,L = int(H/(1/resolution_scale)),int(L/(1/resolution_scale))
-image = cv2.resize(image, (L,H))
-
-#sobel_gy = np.array([[1,2,1],[0,0,0],[-1,-2,-1]])
-if verbose:
-    cv2.namedWindow('Result', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('Result',L,H)
+sobel_gy = np.array([[1,2,1],[0,0,0],[-1,-2,-1]])
 
 how_much_edges = 2
 
 counter = 0
 
+L = 1920
+H = 1080
+if verbose:
+    cv2.namedWindow('Result', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('Result',L,H)
 
-while(cap.isOpened()):
-    ret, image = cap.read()
+for image in images:
     image = cv2.resize(image, (L,H))
-    #image = to_palet(IMAGE = image, colors = list(range(0,255,50)), verbose = False)
+    image = to_palet(IMAGE = image, colors = list(range(0,255,50)), verbose = False)
 #    edges = convolve(image,sobel_gy,'valid') 
     edges = cv2.Canny(image, 100, 200)
     
-    ret, labels = cv2.connectedComponents(edges)
+    ret, labels = cv2.connectedComponents(edges,1)
     _,counts = np.unique(labels, return_counts = True)
 
     best_lines = np.array(np.argpartition(counts, -how_much_edges)[-how_much_edges:])
@@ -112,6 +107,7 @@ while(cap.isOpened()):
         image[horison[:,0],horison[:,1],:] = (0,0,255)
         cv2.imshow('Result',image)
         counter += 1
-        if cv2.waitKey(1) & 0xFF == ord('p'):
-            cv2.imwrite('screenshot.jpg',image)
+        cv2.waitKey(0)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+
