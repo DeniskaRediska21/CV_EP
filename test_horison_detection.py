@@ -3,19 +3,22 @@ import os
 import numpy as np
 import cv2
 import scipy
+import matplotlib.pyplot as plt
+from IPython import display
+import time
 #from scipy.signal import convolve
 #from collections import Counter
 
 verbose = True
 
-#path = os.path.join('Data','oleg_5120x2600_h256_24fps.mov')
-path = os.path.join('Data','out.mp4')
+path = os.path.join('Data','oleg_5120x2600_h256_24fps.mov')
+#path = os.path.join('Data','out.mp4')
 cap = cv2.VideoCapture(path)
 if (cap.isOpened()== False): 
   raise Exception("Error opening video stream or file")
 ret, image = cap.read()
 
-resolution_scale = 1
+resolution_scale = 0.3
 
 H,L,D = np.shape(image)
 H,L = int(H/(1/resolution_scale)),int(L/(1/resolution_scale))
@@ -39,6 +42,8 @@ while(cap.isOpened()):
     edges = cv2.Canny(image, 100, 200)
     
     ret, labels = cv2.connectedComponents(edges)
+    print(np.shape(np.unique(labels)))
+
     _,counts = np.unique(labels, return_counts = True)
 
     best_lines = np.array(np.argpartition(counts, -how_much_edges)[-how_much_edges:])
